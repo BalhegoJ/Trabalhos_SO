@@ -1,0 +1,25 @@
+{
+  "name": "Ambiente SO - C/C++",
+  "build": {
+    "dockerfile": "Dockerfile"
+  },
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "ms-vscode.cpptools",
+        "ms-vscode.cpptools-extension-pack",
+        "ms-vscode.cmake-tools",
+        "twxs.cmake",
+        "ms-vscode.makefile-tools",
+        "yzhang.markdown-all-in-one"
+      ],
+      "settings": {
+        "workbench.startupEditor": "readme",
+        "files.autoSave": "afterDelay",
+        "C_Cpp.clang_format_style": "Google"
+      }
+    }
+  },
+  "forwardPorts": [8080, 12345],
+  "remoteUser": "vscode"
+}
