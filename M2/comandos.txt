@@ -1,0 +1,5 @@
+g++ -Wall -Wextra -pthread JantarDosFilosofos.cpp -o filosofos
+./filosofos
+
+g++ -Wall -Wextra -pthread BarbeiroDorminhoco.cpp -o barbeiro
+./barbeiro
