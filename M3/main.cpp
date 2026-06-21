@@ -10,7 +10,7 @@
 
 using namespace std;
 
-// 1. ESTRUTURAS DE DADOS (MAPEAMENTO DA FAT16)
+//STRUTURAS DE DADOS (MAPEAMENTO DA FAT16)
 
 #pragma pack(push, 1) //Garante que a struct tenha exatamente o tamanho dos bytes
 struct BootBlock {
@@ -38,8 +38,7 @@ struct DirEntry {
 };
 #pragma pack(pop)
 
-//2. FUNÇÕES AUXILIARES
-
+//FUNÇÕES AUXILIARES
 //Formata uma string "nome.txt" para o padrão FAT de 11 bytes: "NOME    TXT"
 void formatar_nome_fat(const string& nome_original, uint8_t* nome_fat_11) {
     memset(nome_fat_11, ' ', 11);
@@ -92,8 +91,8 @@ bool encontrar_arquivo(fstream& disk, const BootBlock& boot, const string& nome_
         disk.seekg(current_offset);
         disk.read(reinterpret_cast<char*>(&out_entry), sizeof(DirEntry));
 
-        if (out_entry.filename[0] == 0x00) break; // Fim da lista
-        if (out_entry.filename[0] == 0xE5) continue; // Arquivo apagado
+        if (out_entry.filename[0] == 0x00) break; //Fim da lista
+        if (out_entry.filename[0] == 0xE5) continue; //Arquivo apagado
 
         if (memcmp(out_entry.filename, nome_formatado, 11) == 0) {
             out_offset = current_offset;
@@ -103,13 +102,13 @@ bool encontrar_arquivo(fstream& disk, const BootBlock& boot, const string& nome_
     return false;
 }
 
-//3. OPERAÇÕES PRINCIPAIS DO TRABALHO
+//Função que atende o requisito - Listar o conteúdo do disco: exibir em uma lista os nomes dos arquivos (e seus respectivos tamanhos) existentes no diretório raiz.
 void listar_diretorio_raiz(fstream& disk, const BootBlock& boot) {
     uint32_t root_dir_offset = (boot.reserved_blocks + (boot.blocks_per_fat * boot.num_fats)) * boot.bytes_per_block;
     disk.seekg(root_dir_offset);
     DirEntry entry;
 
-    cout << "\n--- ARQUIVOS NO DIRETORIO RAIZ ---\n";
+    cout << "\n--- CONTEUDO DO DISCO (DIRETORIO RAIZ) ---\n";
     for (int i = 0; i < boot.root_entries; i++) {
         disk.read(reinterpret_cast<char*>(&entry), sizeof(DirEntry));
 
@@ -117,23 +116,43 @@ void listar_diretorio_raiz(fstream& disk, const BootBlock& boot) {
         if (entry.filename[0] == 0xE5) continue; 
 
         if ((entry.attributes & 0x08) == 0) { //Ignora Volume Label
-            cout << "\nNome: ";
+            cout << "Nome: ";
             for(int j=0; j<8 && entry.filename[j]!=' '; ++j) cout << entry.filename[j];
             if(entry.extension[0] != ' ') {
                 cout << ".";
                 for(int j=0; j<3 && entry.extension[j]!=' '; ++j) cout << entry.extension[j];
             }
-            
             cout << " | Tamanho: " << entry.file_size << " bytes\n";
-            exibir_data_hora_fat(entry.date, entry.time);
-            
-            if (entry.attributes & 0x01) cout << "  [Somente Leitura]\n";
-            if (entry.attributes & 0x02) cout << "  [Oculto]\n";
-            if (entry.attributes & 0x04) cout << "  [Sistema]\n";
         }
     }
 }
 
+//Função que atende o requisito - Exibe Os atributos do Arquivo, Data e Propiedades (se é somente leitura; se é oculto; se é arquivo de sistema)
+void exibir_atributos_arquivo(fstream& disk, const BootBlock& boot, const string& nome) {
+    DirEntry entry;
+    uint32_t dummy_offset;
+    
+    if (encontrar_arquivo(disk, boot, nome, entry, dummy_offset)) {
+        cout << "\n--- ATRIBUTOS DO ARQUIVO: " << nome << " ---\n";
+        
+        exibir_data_hora_fat(entry.date, entry.time);
+        
+        cout << "  Propriedades:\n";
+        bool tem_atributo = false;
+        
+        if (entry.attributes & 0x01) { cout << "  ° Somente Leitura\n"; tem_atributo = true; }
+        if (entry.attributes & 0x02) { cout << "  ° Oculto\n"; tem_atributo = true; }
+        if (entry.attributes & 0x04) { cout << "  ° Arquivo de Sistema\n"; tem_atributo = true; }
+        
+        if (!tem_atributo) {
+            cout << "  ° Nenhum atributo especial (Arquivo Comum)\n";
+        }
+    } else {
+        cout << "Erro: Arquivo '" << nome << "' nao encontrado.\n";
+    }
+}
+
+//Função que atende o requisito - Listar o conteúdo de um arquivo: mostrar (pode ser na tela) o conteúdo de um arquivo do diretório raiz.
 void ler_arquivo(fstream& disk, const BootBlock& boot, uint16_t start_cluster, uint32_t file_size) {
     uint32_t fat_offset = boot.reserved_blocks * boot.bytes_per_block;
     uint32_t root_dir_size = boot.root_entries * 32;
@@ -163,6 +182,7 @@ void ler_arquivo(fstream& disk, const BootBlock& boot, uint16_t start_cluster, u
     cout << "\n";
 }
 
+//Função que atende o requisito - Renomear um arquivo: trocar o nome de um arquivo existente
 void renomear_arquivo(fstream& disk, const BootBlock& boot, const string& nome_antigo, const string& nome_novo) {
     DirEntry entry;
     uint32_t entry_offset;
@@ -179,6 +199,7 @@ void renomear_arquivo(fstream& disk, const BootBlock& boot, const string& nome_a
     }
 }
 
+//Função que atende o requisito - Apagar/remover um arquivo: apagar um arquivo do diretório raiz.
 void apagar_arquivo(fstream& disk, const BootBlock& boot, const string& nome) {
     DirEntry entry;
     uint32_t entry_offset;
@@ -208,6 +229,7 @@ void apagar_arquivo(fstream& disk, const BootBlock& boot, const string& nome) {
     }
 }
 
+//Função que atende o requisito - Inserir/criar um novo arquivo: permitir que se armazene no diretório raiz um novo arquivo externo. 
 void inserir_arquivo(fstream& disk, const BootBlock& boot, const string& caminho_local, const string& nome_destino) {
     ifstream local_file(caminho_local, ios::binary | ios::ate);
     if (!local_file) {
@@ -305,8 +327,15 @@ void inserir_arquivo(fstream& disk, const BootBlock& boot, const string& caminho
     cout << "Sucesso! Arquivo inserido na imagem como '" << nome_destino << "'.\n";
 }
 
-// 4. FUNÇÃO PRINCIPAL (MENU)
+void limparTela(){
+    #if defined(_WIN32) || defined(_WIN64)
+        std::system("cls"); //para Windows
+    #else
+        system("clear"); //para Linux e macOS
+    #endif
+}
 
+//FUNÇÃO PRINCIPAL (MENU)
 int main() {
     fstream disk("disco.img", ios::in | ios::out | ios::binary);
     if (!disk) {
@@ -325,12 +354,14 @@ int main() {
 
     while (opcao != 0) {
         cout << "\n========== MENU FAT16 ==========\n"
-             << "1 - Listar arquivos e atributos\n"
-             << "2 - Ler conteudo de um arquivo\n"
-             << "3 - Renomear um arquivo\n"
-             << "4 - Inserir novo arquivo\n"
-             << "5 - Apagar um arquivo\n"
-             << "0 - Sair\n"
+             << "1 ° Listar conteudo do disco (nomes e tamanhos)\n"
+             << "2 ° Ler conteudo de um arquivo\n"
+             << "3 ° Renomear um arquivo\n"
+             << "4 ° Inserir novo arquivo\n"
+             << "5 ° Apagar um arquivo\n"
+             << "6 ° Exibir atributos de um arquivo especifico (mostrar data/hora da criação/última modificação e atributos)\n"
+             << "7 ° Limpar tela\n"
+             << "0 ° Sair\n"
              << "Escolha uma opcao: ";
         
         if (!(cin >> opcao)) { 
@@ -370,6 +401,14 @@ int main() {
                 cout << "Digite o nome do arquivo a ser apagado (ex: lixo.txt): ";
                 cin >> string1;
                 apagar_arquivo(disk, boot, string1);
+                break;
+            case 6:
+                cout << "Digite o nome do arquivo para ver os atributos (ex: txt.txt): ";
+                cin >> string1;
+                exibir_atributos_arquivo(disk, boot, string1);
+                break;
+            case 7:
+                limparTela();
                 break;
             case 0:
                 cout << "Encerrando...\n";
