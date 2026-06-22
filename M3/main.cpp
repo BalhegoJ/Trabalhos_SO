@@ -7,6 +7,7 @@
 #include <cstdint>
 #include <cctype>
 #include <algorithm>
+#include <ctime>
 
 using namespace std;
 
@@ -39,6 +40,7 @@ struct DirEntry {
 #pragma pack(pop)
 
 //FUNÇÕES AUXILIARES
+
 //Formata uma string "nome.txt" para o padrão FAT de 11 bytes: "NOME    TXT"
 void formatar_nome_fat(const string& nome_original, uint8_t* nome_fat_11) {
     memset(nome_fat_11, ' ', 11);
@@ -59,6 +61,8 @@ void formatar_nome_fat(const string& nome_original, uint8_t* nome_fat_11) {
             nome_fat_11[j++] = toupper(nome_original[i++]);
         }
     }
+
+    //Se digitarmos um nome sem extensão a função vai ler o nome até o oitavo caractere, parar e ignorar a extensão.
 }
 
 //Extrai e imprime data e hora dos bits comprimidos
@@ -317,10 +321,27 @@ void inserir_arquivo(fstream& disk, const BootBlock& boot, const string& caminho
     
     entry.attributes = 0x20; 
     entry.starting_cluster = first_cluster;
-    entry.file_size = file_size;            
-    entry.time = 0x0000; 
-    entry.date = 0x0021; 
+    entry.file_size = file_size;       
+
+    time_t t = time(nullptr);
+    t -= (3 * 3600); // Ajuste do fuso horário (-3 horas)
+    tm* now = localtime(&t);
     
+    int ano = now->tm_year + 1900;
+    int mes = now->tm_mon + 1;
+    int dia = now->tm_mday;
+    int horas = now->tm_hour;
+    int minutos = now->tm_min;
+    int segundos = now->tm_sec;
+
+    //Empacotando a Data (Ano desde 1980, Mês, Dia) em 16 bits
+    uint16_t fat_date = ((ano - 1980) << 9) | (mes << 5) | dia;
+    
+    //Empacotando a Hora (Horas, Minutos, Segundos/2) em 16 bits
+    uint16_t fat_time = (horas << 11) | (minutos << 5) | (segundos / 2);
+
+    entry.time = fat_time;
+    entry.date = fat_date;
     disk.seekp(entry_offset);
     disk.write(reinterpret_cast<char*>(&entry), sizeof(DirEntry));
 
