@@ -1,0 +1,2 @@
+g++ main.cpp -o sistema_arquivo_FAT16
+./sistema_arquivo_FAT16
